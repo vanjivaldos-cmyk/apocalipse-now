@@ -53,6 +53,15 @@
     .welogio{font-size:.77rem;margin-top:7px;color:#7ec87e;}
     .wcensura{font-size:.77rem;margin-top:3px;color:#e09090;}
     .mode-badge{font-size:.65rem;color:#4a7a9a;text-align:center;margin-top:6px;font-style:italic;}
+
+    /* botão finalizar */
+    .finalizar-wrap{text-align:center;margin:28px auto 10px;max-width:400px;}
+    .btn-finalizar{display:inline-block;background:linear-gradient(135deg,#f0c060,#e0a030);color:#0b1625;font-weight:bold;font-size:1.1rem;padding:16px 36px;border-radius:12px;border:none;cursor:pointer;font-family:Georgia,serif;box-shadow:0 4px 18px rgba(240,192,96,.35);transition:transform .15s,box-shadow .15s;letter-spacing:.5px;}
+    .btn-finalizar:hover{transform:scale(1.03);box-shadow:0 6px 24px rgba(240,192,96,.5);}
+    .btn-finalizar:active{transform:scale(.98);}
+    .btn-finalizar:disabled{opacity:.5;cursor:wait;}
+    .finalizar-msg{font-size:.8rem;color:#4caf82;margin-top:10px;display:none;}
+
     footer{text-align:center;font-size:.7rem;color:#3a5a7a;margin-top:34px;font-style:italic;}
 
     @media(max-width:600px){
@@ -130,6 +139,18 @@ if(screen.width < 800 || window.innerWidth < 800){
     </div>
   </div>
 
+</div>
+
+<!-- BOTÃO FINALIZAR -->
+<div class="finalizar-wrap">
+  <button class="btn-finalizar" id="btn-finalizar" onclick="finalizar()">Finalizar meu resultado</button>
+  <div class="finalizar-msg" id="finalizar-msg">Resultado salvo! Imagem gerada abaixo.</div>
+</div>
+
+<!-- AREA DO SCREENSHOT -->
+<div id="screenshot-area" style="display:none;text-align:center;margin:16px auto;max-width:500px;">
+  <p style="color:#8aabcc;font-size:.85rem;margin-bottom:10px;">Segure na imagem para salvar no celular:</p>
+  <img id="screenshot-img" style="width:100%;border-radius:10px;border:2px solid #1e3650;" alt="Seu resultado"/>
 </div>
 
 <footer>Baseado em Apocalipse 2–3 · Dimensões: Primeiro Amor · Santidade · Discernimento · Obras · Fidelidade</footer>
@@ -469,6 +490,133 @@ function loadECharts(){
   };
   document.head.appendChild(script);
 }
+
+// ═══════════════════════════════════════════════════
+// FINALIZAR — screenshot + envio Google Forms
+// ═══════════════════════════════════════════════════
+function finalizar(){
+  var btn = document.getElementById('btn-finalizar');
+  btn.disabled = true;
+  btn.textContent = 'Gerando resultado...';
+
+  // Captura o resultado atual
+  var igreja = document.getElementById('wname').textContent;
+  var pctEl = document.getElementById('pct-'+igreja);
+  var pct = pctEl ? pctEl.textContent : '';
+
+  // ── Enviar para Google Forms (preencher IDs quando o form estiver pronto) ──
+  // GOOGLE_FORM_URL e ENTRY_IDS serão configurados depois
+  if(typeof GOOGLE_FORM_URL !== 'undefined' && GOOGLE_FORM_URL){
+    try {
+      var formData = new FormData();
+      formData.append(ENTRY_IDS[0], userScores[0]); // Primeiro Amor
+      formData.append(ENTRY_IDS[1], userScores[1]); // Santidade
+      formData.append(ENTRY_IDS[2], userScores[2]); // Discernimento
+      formData.append(ENTRY_IDS[3], userScores[3]); // Obras
+      formData.append(ENTRY_IDS[4], userScores[4]); // Fidelidade
+      formData.append(ENTRY_IDS[5], igreja);         // Igreja Resultado
+      formData.append(ENTRY_IDS[6], pct);             // Porcentagem
+      navigator.sendBeacon(GOOGLE_FORM_URL, formData);
+    } catch(e){}
+  }
+
+  // ── Gerar screenshot via html2canvas ──
+  var screenshotLib = document.createElement('script');
+  screenshotLib.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+  screenshotLib.onload = function(){
+    var mainEl = document.querySelector('.main');
+    html2canvas(mainEl, {
+      backgroundColor:'#0b1625',
+      scale:2,
+      useCORS:true,
+      logging:false
+    }).then(function(canvasShot){
+      var imgData = canvasShot.toDataURL('image/png');
+      var imgEl = document.getElementById('screenshot-img');
+      imgEl.src = imgData;
+      document.getElementById('screenshot-area').style.display = 'block';
+      document.getElementById('finalizar-msg').style.display = 'block';
+      btn.textContent = 'Resultado finalizado!';
+      // Scroll para a imagem
+      document.getElementById('screenshot-area').scrollIntoView({behavior:'smooth'});
+    }).catch(function(){
+      // Fallback: se html2canvas falhar, gera imagem simples via canvas
+      gerarImagemSimples(igreja, pct, btn);
+    });
+  };
+  screenshotLib.onerror = function(){
+    // Sem internet: gera imagem simples via canvas
+    gerarImagemSimples(igreja, pct, btn);
+  };
+  document.head.appendChild(screenshotLib);
+}
+
+// Fallback: gera uma imagem resumo sem html2canvas
+function gerarImagemSimples(igreja, pct, btn){
+  var c = document.createElement('canvas');
+  c.width = 600; c.height = 500;
+  var x = c.getContext('2d');
+
+  // fundo
+  x.fillStyle = '#0b1625'; x.fillRect(0,0,600,500);
+
+  // titulo
+  x.fillStyle = '#f0c060'; x.font = 'bold 22px Georgia'; x.textAlign = 'center';
+  x.fillText('As 7 Igrejas do Apocalipse', 300, 40);
+  x.fillStyle = '#8aabcc'; x.font = 'italic 14px Georgia';
+  x.fillText('Meu Resultado', 300, 65);
+
+  // scores
+  x.textAlign = 'left'; x.font = '16px Georgia';
+  var labels = ['Primeiro Amor','Santidade','Discernimento','Obras','Fidelidade'];
+  for(var i=0;i<5;i++){
+    var y = 110 + i*36;
+    x.fillStyle = '#b0c8e0';
+    x.fillText(labels[i]+':', 60, y);
+    x.fillStyle = '#f0c060'; x.font = 'bold 18px Georgia';
+    x.fillText(userScores[i]+'/10', 280, y);
+    // barra
+    x.fillStyle = '#1e3650'; x.fillRect(340, y-12, 200, 16);
+    x.fillStyle = '#f0c060'; x.fillRect(340, y-12, userScores[i]*20, 16);
+    x.font = '16px Georgia';
+  }
+
+  // resultado
+  var igrejaObj = null;
+  for(var j=0;j<CH.length;j++){ if(CH[j].label===igreja) igrejaObj=CH[j]; }
+  var cor = igrejaObj ? igrejaObj.color : '#f0c060';
+
+  x.fillStyle = cor; x.font = 'bold 26px Georgia'; x.textAlign = 'center';
+  x.fillText(igreja+' ('+pct+')', 300, 340);
+  if(igrejaObj){
+    x.fillStyle = '#c0d4e4'; x.font = 'italic 13px Georgia';
+    // quebra texto da desc
+    var words = igrejaObj.desc.split(' ');
+    var line = '', ly = 375;
+    for(var w=0;w<words.length;w++){
+      var test = line + words[w] + ' ';
+      if(x.measureText(test).width > 480 && line !== ''){
+        x.fillText(line.trim(), 300, ly); ly += 20; line = words[w]+' ';
+      } else { line = test; }
+    }
+    x.fillText(line.trim(), 300, ly);
+  }
+
+  // rodapé
+  x.fillStyle = '#3a5a7a'; x.font = '11px Georgia';
+  x.fillText('Apocalipse 2–3 · tinyurl.com/apocalipse-now2', 300, 480);
+
+  var imgData = c.toDataURL('image/png');
+  document.getElementById('screenshot-img').src = imgData;
+  document.getElementById('screenshot-area').style.display = 'block';
+  document.getElementById('finalizar-msg').style.display = 'block';
+  btn.textContent = 'Resultado finalizado!';
+  document.getElementById('screenshot-area').scrollIntoView({behavior:'smooth'});
+}
+
+// ── Google Forms config ──
+var GOOGLE_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf-SyuGsFsktqEk8x1A03mgpviS5ltVbbwt2bpXnFFV3SrTxw/formResponse';
+var ENTRY_IDS = ['entry.1475163126','entry.1273091286','entry.1481450299','entry.1573469975','entry.1531114171','entry.1389631871','entry.1757981028'];
 
 // ── iniciar ───────────────────────────────────────────────────────────
 // Mostrar canvas imediatamente, depois tentar ECharts
